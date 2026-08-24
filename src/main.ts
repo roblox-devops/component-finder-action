@@ -1,27 +1,77 @@
-import * as core from '@actions/core';
-import { wait } from './wait.js';
+import { getInput, setFailed, info, warning, setOutput } from '@actions/core';
+
+import type { TComponentMap } from './types/components.js';
+import {
+  COMPONENTS_INPUT,
+  COMPONENT_SEARCH_DIRECTORIES_INPUT,
+} from './constants.js';
+
+import { recursiveSearchForComponents } from './search.js';
+import {
+  resolveAbsoluteSearchDirectories,
+  resolveActualComponentNames,
+} from './resolve.js';
 
 /**
  * The main function for the action.
  *
- * @returns Resolves when the action is complete.
+ * @returns {Promise<void>} Resolves when the action is complete.
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds');
+    const components = getInput(COMPONENTS_INPUT, { required: false })
+      ?.split(',')
+      .map((component) => component.trim())
+      .filter((s) => s.length > 0);
+    const componentSearchDirectories = getInput(
+      COMPONENT_SEARCH_DIRECTORIES_INPUT,
+      { required: false },
+    )
+      ?.split(',')
+      .map((directory) => directory.trim())
+      .filter((s) => s.length > 0);
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`);
+    const resolvedComponents = resolveActualComponentNames(components);
+    const resolvedComponentSearchDirectories = resolveAbsoluteSearchDirectories(
+      componentSearchDirectories,
+    );
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString());
-    await wait(parseInt(ms, 10));
-    core.debug(new Date().toTimeString());
+    const prettyDirectories =
+      componentSearchDirectories.length === 0
+        ? 'all directories'
+        : componentSearchDirectories.join(', ');
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString());
+    const prettyComponents =
+      components.length === 0 ? 'all components' : components.join(', ');
+
+    info(
+      `Finding components: ${prettyComponents} in directories: ${prettyDirectories}`,
+    );
+
+    if (resolvedComponentSearchDirectories.length === 0) {
+      resolvedComponentSearchDirectories.push(process.cwd());
+    }
+
+    const componentMap: TComponentMap = {};
+
+    for (const searchDir of resolvedComponentSearchDirectories) {
+      Object.assign(
+        componentMap,
+        recursiveSearchForComponents(resolvedComponents, searchDir),
+      );
+    }
+
+    const foundComponents = Object.keys(componentMap);
+
+    for (const component of resolvedComponents) {
+      if (!foundComponents.includes(component)) {
+        warning(`Component ${component.split(':')[0]} not found`);
+      }
+    }
+
+    setOutput('components', JSON.stringify(componentMap));
   } catch (error) {
     // Fail the workflow run if an error occurs
-    if (error instanceof Error) core.setFailed(error.message);
+    if (error instanceof Error) setFailed(error.message);
   }
 }

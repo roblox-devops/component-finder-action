@@ -1,23 +1,32 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: 'Component Finder'
+description:
+  'Finds components within a project, with an optional folder filter. If not
+  specified it will search the entire project (excluding the .git folder).'
+author: 'Roblox'
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: heart
-  color: red
+  icon: 'heart'
+  color: 'red'
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
-    required: true
-    default: '1000'
+  components:
+    description:
+      'Comma delimited list of components to search for. If not specified it
+      will search for all components.'
+    required: false
+
+  component-search-directories:
+    description:
+      'Comma delimited list of folders to search within. If not specified it
+      will search the entire project (excluding the .git folder).'
+    required: false
 
 # Define your outputs here.
 outputs:
-  time:
-    description: Your output description here
+  components:
+    description: 'A map of components to their locations.'
 
 runs:
   using: node24
